@@ -3,44 +3,126 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <title>3D Деревня — Реалистичный персонаж</title>
+  <title>Эхо: Сектор 7 - Этап 1</title>
   <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
+    * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', system-ui, sans-serif; }
     html, body {
-      width: 100%; height: 100%; overflow: hidden; background: #87ceeb;
+      width: 100%; height: 100%; overflow: hidden; background: #000;
       touch-action: none; user-select: none; -webkit-tap-highlight-color: transparent;
     }
     canvas { display: block; }
-    #info {
-      position: absolute; top: 12px; left: 50%; transform: translateX(-50%);
-      color: white; font-family: system-ui, sans-serif; font-size: 15px;
-      text-shadow: 0 1px 3px rgba(0,0,0,0.6); pointer-events: none; z-index: 10; white-space: nowrap;
+
+    /* --- UI СЛОЙ --- */
+    #ui-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }
+
+    /* Экран регистрации */
+    #auth-screen {
+      position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(0, 5, 15, 0.4); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+      display: flex; flex-direction: column; justify-content: center; align-items: center;
+      z-index: 100; transition: opacity 1s ease; pointer-events: auto;
     }
-    #controls { position: fixed; bottom: 24px; left: 24px; width: 168px; height: 168px; z-index: 20; }
-    .btn {
-      position: absolute; width: 56px; height: 56px; border-radius: 14px; border: none;
-      background: rgba(255, 255, 255, 0.85); color: #222; font-size: 22px; font-weight: bold;
-      box-shadow: 0 3px 10px rgba(0,0,0,0.25); touch-action: none; cursor: pointer;
-      transition: background 0.1s, transform 0.1s;
+    .glass-panel {
+      background: rgba(0, 20, 30, 0.7); border: 1px solid rgba(0, 255, 204, 0.3);
+      box-shadow: 0 0 30px rgba(0, 255, 204, 0.1); border-radius: 16px; padding: 30px; 
+      width: 90%; max-width: 350px; text-align: center;
     }
-    .btn:active, .btn.pressed { background: rgba(80, 160, 255, 0.95); color: white; transform: scale(0.92); }
-    .up { top: 0; left: 56px; } .left { top: 56px; left: 0; }
-    .right { top: 56px; left: 112px; } .down { top: 112px; left: 56px; }
-    @media (max-width: 380px) {
-      #controls { width: 144px; height: 144px; }
-      .btn { width: 48px; height: 48px; font-size: 18px; }
-      .up { left: 48px; } .left { top: 48px; }
-      .right { top: 48px; left: 96px; } .down { top: 96px; left: 48px; }
+    h1 { color: #00ffcc; font-size: 28px; margin-bottom: 5px; text-shadow: 0 0 10px rgba(0,255,204,0.5); letter-spacing: 2px;}
+    p.subtitle { color: #88aaaa; font-size: 12px; margin-bottom: 25px; text-transform: uppercase; letter-spacing: 1px;}
+    input {
+      width: 100%; padding: 14px; margin-bottom: 20px; background: rgba(0, 0, 0, 0.5); 
+      border: 1px solid #005566; color: white; border-radius: 8px; font-size: 16px; text-align: center; outline: none;
     }
+    button {
+      width: 100%; padding: 14px; background: #00ffcc; color: #000; border: none; border-radius: 8px; 
+      font-size: 16px; font-weight: bold; cursor: pointer; text-transform: uppercase; pointer-events: auto;
+    }
+
+    /* Текст катсцены */
+    #cinematic-text {
+      position: absolute; top: 40%; left: 50%; transform: translate(-50%, -50%);
+      color: white; font-size: 22px; text-align: center; width: 80%; font-weight: bold;
+      opacity: 0; transition: opacity 1s ease; z-index: 50; text-shadow: 0 2px 10px rgba(0,0,0,0.8);
+    }
+    #alert-overlay {
+      position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(255, 0, 0, 0.3); opacity: 0; transition: opacity 0.5s; z-index: 40;
+    }
+
+    /* Игровой интерфейс (появляется после катсцены) */
+    #game-ui { display: none; opacity: 0; transition: opacity 1s; position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 20; pointer-events: none;}
+    
+    /* Задание */
+    #quest-hud {
+      position: absolute; top: 20px; left: 20px; color: #00ffcc; text-shadow: 0 0 5px #00ffcc;
+      font-size: 16px; font-weight: bold; background: rgba(0,0,0,0.5); padding: 10px 15px; border-radius: 8px;
+      border-left: 3px solid #00ffcc;
+    }
+
+    /* Джойстик */
+    #joystick-zone {
+      position: absolute; bottom: 0; left: 0; width: 50%; height: 50%;
+      pointer-events: auto;
+    }
+    #joystick-base {
+      position: absolute; width: 120px; height: 120px; border-radius: 50%;
+      background: rgba(0, 255, 204, 0.1); border: 2px solid rgba(0, 255, 204, 0.3);
+      display: none; transform: translate(-50%, -50%); pointer-events: none;
+    }
+    #joystick-stick {
+      position: absolute; width: 50px; height: 50px; border-radius: 50%;
+      background: rgba(0, 255, 204, 0.8); box-shadow: 0 0 15px #00ffcc;
+      top: 50%; left: 50%; transform: translate(-50%, -50%); pointer-events: none;
+    }
+
+    /* Кнопки действий */
+    #action-buttons {
+      position: absolute; bottom: 30px; right: 20px; display: flex; flex-direction: column; gap: 15px; pointer-events: auto;
+    }
+    .act-btn {
+      width: 65px; height: 65px; border-radius: 50%; border: 2px solid #00ffcc;
+      background: rgba(0, 20, 30, 0.7); color: #00ffcc; font-size: 24px;
+      display: flex; justify-content: center; align-items: center;
+      box-shadow: 0 0 10px rgba(0, 255, 204, 0.3); cursor: pointer; outline: none;
+    }
+    .act-btn:active { background: rgba(0, 255, 204, 0.4); transform: scale(0.9); }
+    .act-btn.interact { border-color: #ffcc00; color: #ffcc00; box-shadow: 0 0 20px rgba(255, 204, 0, 0.6); animation: pulse 1s infinite alternate; }
+    
+    @keyframes pulse { from { transform: scale(1); } to { transform: scale(1.1); } }
+
   </style>
 </head>
 <body>
-  <div id="info">Загрузка персонажа... ⏳</div>
-  <div id="controls">
-    <button class="btn up"    data-dir="up">▲</button>
-    <button class="btn left"  data-dir="left">◀</button>
-    <button class="btn right" data-dir="right">▶</button>
-    <button class="btn down"  data-dir="down">▼</button>
+
+  <div id="ui-layer">
+    <!-- Экран регистрации -->
+    <div id="auth-screen">
+      <div class="glass-panel">
+        <h1>ЭХО</h1>
+        <p class="subtitle">Сектор 7</p>
+        <input type="text" id="username" placeholder="Введите позывной" maxlength="12" autocomplete="off">
+        <button id="start-btn">Начать миссию</button>
+      </div>
+    </div>
+
+    <!-- Катсцена -->
+    <div id="alert-overlay"></div>
+    <div id="cinematic-text"></div>
+
+    <!-- Игровой интерфейс -->
+    <div id="game-ui">
+      <div id="quest-hud">Задание: Найти обломки (0/3)</div>
+      
+      <div id="joystick-zone">
+        <div id="joystick-base"><div id="joystick-stick"></div></div>
+      </div>
+      
+      <div id="action-buttons">
+        <button class="act-btn" id="btn-interact" style="display:none;">⚡</button>
+        <button class="act-btn" id="btn-jump">🦘</button>
+        <button class="act-btn" id="btn-camera">📷</button>
+      </div>
+    </div>
   </div>
 
   <script type="importmap">
@@ -56,201 +138,400 @@
     import * as THREE from 'three';
     import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
-    // ---------- Сцена ----------
+    // ==========================================
+    // 1. БАЗОВАЯ НАСТРОЙКА 3D
+    // ==========================================
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x87ceeb);
-    scene.fog = new THREE.Fog(0x87ceeb, 20, 90);
+    scene.background = new THREE.Color(0x000000);
+    scene.fog = new THREE.FogExp2(0x000000, 0.015);
 
-    const camera = new THREE.PerspectiveCamera(60, innerWidth / innerHeight, 0.1, 200);
+    const camera = new THREE.PerspectiveCamera(60, innerWidth / innerHeight, 0.1, 1000);
     const renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.setSize(innerWidth, innerHeight);
     renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
     renderer.shadowMap.enabled = true;
     document.body.appendChild(renderer.domElement);
 
-    // ---------- Свет ----------
-    const sun = new THREE.DirectionalLight(0xfff5e0, 2);
-    sun.position.set(10, 20, 10);
-    sun.castShadow = true;
-    sun.shadow.mapSize.set(1024, 1024);
-    sun.shadow.camera.left = -50;
-    sun.shadow.camera.right = 50;
-    sun.shadow.camera.top = 50;
-    sun.shadow.camera.bottom = -50;
-    scene.add(sun);
-    scene.add(new THREE.AmbientLight(0xffffff, 0.6));
+    const ambientLight = new THREE.AmbientLight(0x334455, 1.5);
+    scene.add(ambientLight);
+    
+    // Свет "прожектора" от скафандра (для атмосферы)
+    const playerLight = new THREE.PointLight(0xaaccff, 3, 15);
+    scene.add(playerLight);
 
-    // ---------- Земля и дорога ----------
-    const grass = new THREE.Mesh(
-      new THREE.PlaneGeometry(200, 200),
-      new THREE.MeshStandardMaterial({ color: 0x4a7c3a })
-    );
-    grass.rotation.x = -Math.PI / 2;
-    grass.receiveShadow = true;
-    scene.add(grass);
+    // ==========================================
+    // 2. КОСМОС (ДЛЯ РЕГИСТРАЦИИ И КАТСЦЕНЫ)
+    // ==========================================
+    const starsGeo = new THREE.BufferGeometry();
+    const posArray = new Float32Array(2000 * 3);
+    for(let i = 0; i < 2000 * 3; i++) posArray[i] = (Math.random() - 0.5) * 1000;
+    starsGeo.setAttribute('position', new THREE.BufferAttribute(posArray, 3));
+    const stars = new THREE.Points(starsGeo, new THREE.PointsMaterial({ color: 0xffffff, size: 1 }));
+    scene.add(stars);
 
-    const road = new THREE.Mesh(
-      new THREE.PlaneGeometry(6, 200),
-      new THREE.MeshStandardMaterial({ color: 0x8b7355 })
-    );
-    road.rotation.x = -Math.PI / 2;
-    road.position.y = 0.01;
-    road.receiveShadow = true;
-    scene.add(road);
+    const earth = new THREE.Mesh(new THREE.SphereGeometry(40, 32, 32), new THREE.MeshStandardMaterial({ color: 0x1133aa, emissive: 0x001144 }));
+    earth.position.set(-150, -30, -200);
+    scene.add(earth);
 
-    // ---------- Дома ----------
-    function createHouse(x, z, rot) {
-      const house = new THREE.Group();
-      const walls = new THREE.Mesh(new THREE.BoxGeometry(5, 3, 4), new THREE.MeshStandardMaterial({ color: 0xd9c8a9 }));
-      walls.position.y = 1.5; walls.castShadow = true; house.add(walls);
-      const roof = new THREE.Mesh(new THREE.ConeGeometry(3.8, 2, 4), new THREE.MeshStandardMaterial({ color: 0x8b3a2a }));
-      roof.position.y = 4; roof.rotation.y = Math.PI / 4; roof.castShadow = true; house.add(roof);
-      const door = new THREE.Mesh(new THREE.BoxGeometry(0.9, 1.8, 0.1), new THREE.MeshStandardMaterial({ color: 0x5c3a21 }));
-      door.position.set(0, 0.9, 2.01); house.add(door);
-      const windowMat = new THREE.MeshStandardMaterial({ color: 0x88ccee });
-      [[-1.5, 1.8], [1.5, 1.8]].forEach(([wx, wy]) => {
-        const win = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 0.1), windowMat);
-        win.position.set(wx, wy, 2.01); house.add(win);
-      });
-      house.position.set(x, 0, z); house.rotation.y = rot; return house;
+    const moon = new THREE.Mesh(new THREE.SphereGeometry(20, 32, 32), new THREE.MeshStandardMaterial({ color: 0x888888 }));
+    moon.position.set(0, -30, -100);
+    scene.add(moon);
+
+    const rocket = new THREE.Group();
+    const rBody = new THREE.Mesh(new THREE.CylinderGeometry(0.8, 1, 5, 8), new THREE.MeshStandardMaterial({ color: 0xcccccc, metalness: 0.8 }));
+    rBody.rotation.x = Math.PI / 2; rocket.add(rBody);
+    const rFire = new THREE.Mesh(new THREE.ConeGeometry(0.8, 2, 8), new THREE.MeshBasicMaterial({ color: 0x00aaff }));
+    rFire.rotation.x = Math.PI / 2; rFire.position.z = 3.5; rocket.add(rFire);
+    rocket.position.set(-50, 20, 50);
+    scene.add(rocket);
+
+    // ==========================================
+    // 3. СЦЕНА ПЛАНЕТЫ (ДЛЯ ГЛАВЫ 1)
+    // ==========================================
+    const planetGroup = new THREE.Group();
+    planetGroup.visible = false; // Скрыта до поры до времени
+    scene.add(planetGroup);
+
+    // Поверхность
+    const groundGeo = new THREE.PlaneGeometry(200, 200, 32, 32);
+    const groundMat = new THREE.MeshStandardMaterial({ color: 0x222222, roughness: 1 });
+    const ground = new THREE.Mesh(groundGeo, groundMat);
+    ground.rotation.x = -Math.PI / 2;
+    ground.receiveShadow = true;
+    planetGroup.add(ground);
+
+    // Сетка
+    const grid = new THREE.GridHelper(200, 50, 0x00ffcc, 0x003333);
+    grid.position.y = 0.1;
+    planetGroup.add(grid);
+
+    // Обломки
+    const debrisList = [];
+    for(let i = 0; i < 3; i++) {
+      const deb = new THREE.Mesh(
+        new THREE.BoxGeometry(1.5, 0.5, 2),
+        new THREE.MeshStandardMaterial({ color: 0x888888, metalness: 0.9, roughness: 0.3 })
+      );
+      deb.position.set((Math.random() - 0.5) * 30, 0.25, (Math.random() - 0.5) * 30);
+      deb.castShadow = true;
+      planetGroup.add(deb);
+      debrisList.push({ mesh: deb, collected: false });
     }
-    scene.add(createHouse(-5, -10, 0));
-    scene.add(createHouse(6, 5, Math.PI));
 
-    // ---------- Деревья ----------
-    function createTree(x, z) {
-      const tree = new THREE.Group();
-      const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.2, 1.5, 8), new THREE.MeshStandardMaterial({ color: 0x5c3a21 }));
-      trunk.position.y = 0.75; trunk.castShadow = true; tree.add(trunk);
-      const crown = new THREE.Mesh(new THREE.ConeGeometry(0.9, 2, 8), new THREE.MeshStandardMaterial({ color: 0x2d6b2d }));
-      crown.position.y = 2; crown.castShadow = true; tree.add(crown);
-      tree.position.set(x, 0, z); return tree;
-    }
-    for (let i = -40; i <= 40; i += 8) {
-      scene.add(createTree(-6 - Math.random() * 3, i + Math.random() * 4));
-      scene.add(createTree(6 + Math.random() * 3, i + Math.random() * 4));
-    }
-
-    // ---------- Реалистичный персонаж ----------
+    // ==========================================
+    // 4. ПЕРСОНАЖ
+    // ==========================================
     const character = new THREE.Group();
-    scene.add(character);
+    planetGroup.add(character); // Добавляем в группу планеты
 
-    let mixer;
-    let walkAction;
+    let mixer, walkAction;
     let isModelLoaded = false;
 
     const loader = new GLTFLoader();
-    // Загружаем модель солдата с официального сайта Three.js
     loader.load('https://threejs.org/examples/models/gltf/Soldier.glb', (gltf) => {
       const model = gltf.scene;
-      
-      // Настройка размера и теней
       model.scale.set(0.8, 0.8, 0.8);
+      
+      // Красим под космонавта
       model.traverse((child) => {
         if (child.isMesh) {
           child.castShadow = true;
-          child.receiveShadow = true;
+          child.material = new THREE.MeshStandardMaterial({ color: 0xdddddd, roughness: 0.4, metalness: 0.6, skinning: true });
+          if (child.name.includes('Head')) {
+            child.material.color.setHex(0x111111);
+            child.material.metalness = 1;
+          }
         }
       });
       
       character.add(model);
-      
-      // Подключаем анимации
       mixer = new THREE.AnimationMixer(model);
       
-      // Ищем анимацию ходьбы (walk) и покоя (idle)
-      const walkClip = gltf.animations.find(clip => clip.name === 'walk' || clip.name === 'Walk');
+      const walkClip = gltf.animations.find(clip => clip.name.toLowerCase() === 'walk');
       if (walkClip) {
         walkAction = mixer.clipAction(walkClip);
         walkAction.play();
-        walkAction.paused = true; // Изначально стоит на месте
+        walkAction.paused = true;
+      }
+      isModelLoaded = true;
+    });
+
+    // ==========================================
+    // 5. ЛОГИКА КАМЕР
+    // ==========================================
+    let currentCamMode = 0; // 0: Средняя, 1: Малая, 2: От 1-го лица
+    let targetCamPos = new THREE.Vector3();
+    let targetLookAt = new THREE.Vector3();
+    
+    // Оффсеты камер
+    const camOffsets = [
+      new THREE.Vector3(0, 4, -7),  // Средняя
+      new THREE.Vector3(0, 2.5, -3), // Малая
+      new THREE.Vector3(0, 1.6, 0)   // От 1 лица (в голове)
+    ];
+
+    document.getElementById('btn-camera').addEventListener('click', () => {
+      currentCamMode = (currentCamMode + 1) % 3;
+      
+      // Если 1-е лицо, прячем модель, чтобы не смотреть "изнутри" головы
+      if(isModelLoaded) {
+        character.children[0].visible = (currentCamMode !== 2);
+      }
+    });
+
+    // ==========================================
+    // 6. УПРАВЛЕНИЕ (Джойстик и Прыжок)
+    // ==========================================
+    let moveVector = new THREE.Vector2(0, 0); // X, Y (от -1 до 1)
+    let isJumping = false;
+    let jumpVelocity = 0;
+    const GRAVITY = -20;
+    let targetRotation = 0;
+
+    // Джойстик
+    const jZone = document.getElementById('joystick-zone');
+    const jBase = document.getElementById('joystick-base');
+    const jStick = document.getElementById('joystick-stick');
+    const maxDist = 40; // Радиус хода стика
+
+    let touchId = null;
+    let centerX = 0, centerY = 0;
+
+    jZone.addEventListener('pointerdown', (e) => {
+      if (touchId !== null) return;
+      touchId = e.pointerId;
+      centerX = e.clientX;
+      centerY = e.clientY;
+      
+      jBase.style.display = 'block';
+      jBase.style.left = centerX + 'px';
+      jBase.style.top = centerY + 'px';
+      jStick.style.transform = `translate(-50%, -50%)`;
+    });
+
+    jZone.addEventListener('pointermove', (e) => {
+      if (e.pointerId !== touchId) return;
+      
+      let dx = e.clientX - centerX;
+      let dy = e.clientY - centerY;
+      let dist = Math.hypot(dx, dy);
+      
+      if (dist > maxDist) {
+        dx = (dx / dist) * maxDist;
+        dy = (dy / dist) * maxDist;
       }
       
-      document.getElementById('info').innerText = "Управляй персонажем кнопками 👇";
-      isModelLoaded = true;
-    }, undefined, (error) => {
-      console.error("Ошибка загрузки модели:", error);
-      document.getElementById('info').innerText = "Ошибка загрузки модели 😢";
+      jStick.style.transform = `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`;
+      
+      moveVector.x = dx / maxDist;
+      moveVector.y = dy / maxDist;
     });
 
-    // ---------- Управление ----------
-    const keys = { up: false, down: false, left: false, right: false };
-    document.querySelectorAll('.btn').forEach(btn => {
-      const dir = btn.dataset.dir;
-      const press = (e) => { e.preventDefault(); btn.classList.add('pressed'); keys[dir] = true; };
-      const release = (e) => { e.preventDefault(); btn.classList.remove('pressed'); keys[dir] = false; };
-      btn.addEventListener('pointerdown', press);
-      btn.addEventListener('pointerup', release);
-      btn.addEventListener('pointercancel', release);
-      btn.addEventListener('pointerleave', release);
+    const endTouch = (e) => {
+      if (e.pointerId !== touchId) return;
+      touchId = null;
+      jBase.style.display = 'none';
+      moveVector.set(0, 0);
+    };
+
+    jZone.addEventListener('pointerup', endTouch);
+    jZone.addEventListener('pointercancel', endTouch);
+
+    // Прыжок
+    document.getElementById('btn-jump').addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      if (!isJumping) {
+        isJumping = true;
+        jumpVelocity = 8; // Сила прыжка
+      }
     });
 
-    addEventListener('blur', () => {
-      Object.keys(keys).forEach(k => keys[k] = false);
-      document.querySelectorAll('.btn').forEach(b => b.classList.remove('pressed'));
-    });
-
-    // ---------- Анимация ----------
+    // ==========================================
+    // 7. ГЛАВНЫЙ ЦИКЛ И КАТСЦЕНА
+    // ==========================================
     const clock = new THREE.Clock();
-    let targetRotation = 0;
-    camera.position.set(4, 4, -8);
+    let gameState = 'MENU'; // MENU, FLYING, CRASH, GAME
+    
+    const authScreen = document.getElementById('auth-screen');
+    const startBtn = document.getElementById('start-btn');
+    const usernameInput = document.getElementById('username');
+    const cinematicText = document.getElementById('cinematic-text');
+    const alertOverlay = document.getElementById('alert-overlay');
+    const gameUI = document.getElementById('game-ui');
+    const questHud = document.getElementById('quest-hud');
+
+    let questCount = 0;
+
+    function showText(text, dur) {
+      cinematicText.innerText = text;
+      cinematicText.style.opacity = 1;
+      setTimeout(() => cinematicText.style.opacity = 0, dur);
+    }
+
+    startBtn.addEventListener('click', () => {
+      const name = usernameInput.value.trim() || "Пилот";
+      authScreen.style.opacity = '0';
+      setTimeout(() => authScreen.style.display = 'none', 1000);
+      
+      gameState = 'FLYING';
+      showText(`Пилот ${name}, стыковка...`, 2000);
+      
+      setTimeout(() => {
+        showText("ВНИМАНИЕ! ОТКАЗ СИСТЕМ!", 3000);
+        alertOverlay.style.opacity = 1;
+        
+        setTimeout(() => {
+          showText("Крушение...", 2000);
+          gameState = 'CRASH';
+        }, 1500);
+      }, 2500);
+    });
+
+    // Стартовая позиция камеры
+    camera.position.set(0, 20, 80);
+    camera.lookAt(-50, 20, 50);
 
     function animate() {
       requestAnimationFrame(animate);
       const dt = Math.min(clock.getDelta(), 0.1);
+      const time = clock.getElapsedTime();
 
-      let dx = 0, dz = 0;
-      if (keys.up)    dz -= 1;
-      if (keys.down)  dz += 1;
-      if (keys.left)  dx -= 1;
-      if (keys.right) dx += 1;
-
-      const isWalking = dx !== 0 || dz !== 0;
-
-      // Логика движения
-      if (isWalking) {
-        const len = Math.hypot(dx, dz);
-        dx /= len; dz /= len;
-        
-        character.position.x += dx * 3 * dt;
-        character.position.z += dz * 3 * dt;
-        
-        // Ограничения карты
-        character.position.x = Math.max(-30, Math.min(30, character.position.x));
-        character.position.z = Math.max(-90, Math.min(90, character.position.z));
-        
-        // Модель солдата смотрит по оси +Z (или -Z в зависимости от модели).
-        // Чтобы он смотрел в сторону движения, вычисляем угол.
-        targetRotation = Math.atan2(dx, dz);
+      // --- ЛОГИКА СОСТОЯНИЙ ---
+      if (gameState === 'MENU') {
+        camera.position.x = Math.sin(time * 0.5) * 5;
+        camera.lookAt(-50, 20, 50);
+      }
+      
+      else if (gameState === 'FLYING') {
+        rocket.position.z -= 15 * dt;
+        rocket.position.x += 2 * dt;
+        rocket.position.y -= 2 * dt;
+        camera.position.lerp(new THREE.Vector3(rocket.position.x + 10, rocket.position.y + 5, rocket.position.z + 15), 2 * dt);
+        camera.lookAt(rocket.position);
       }
 
-      // Плавный поворот
-      let diff = targetRotation - character.rotation.y;
-      while (diff > Math.PI)  diff -= Math.PI * 2;
-      while (diff < -Math.PI) diff += Math.PI * 2;
-      character.rotation.y += diff * Math.min(1, 8 * dt);
+      else if (gameState === 'CRASH') {
+        rocket.position.z -= 40 * dt;
+        rocket.position.y -= 10 * dt;
+        camera.position.x += (Math.random() - 0.5) * 0.8;
+        camera.position.y += (Math.random() - 0.5) * 0.8;
+        camera.lookAt(rocket.position);
 
-      // Анимация ходьбы
-      if (isModelLoaded) {
-        if (isWalking) {
-          if (walkAction) walkAction.paused = false;
-        } else {
-          if (walkAction) walkAction.paused = true;
+        // Когда долетели до луны
+        if (rocket.position.y < -25) {
+          gameState = 'GAME';
+          scene.background = new THREE.Color(0x050510);
+          earth.visible = false;
+          moon.visible = false;
+          stars.visible = false;
+          rocket.visible = false;
+          alertOverlay.style.opacity = 0;
+          
+          planetGroup.visible = true;
+          camera.position.set(0, 5, 10);
+          
+          gameUI.style.display = 'block';
+          setTimeout(() => gameUI.style.opacity = '1', 100);
+          
+          showText("Выживших нет. Найди обломки для связи.", 3000);
         }
-        if (mixer) mixer.update(dt);
       }
 
-      // Камера
-      const camOffset = new THREE.Vector3(0, 4, -8);
-      camOffset.applyAxisAngle(new THREE.Vector3(0, 1, 0), character.rotation.y);
-      camera.position.lerp(character.position.clone().add(camOffset), 1 - Math.pow(0.001, dt));
-      camera.lookAt(character.position.x, character.position.y + 1, character.position.z);
+      // --- ИГРОВОЙ ПРОЦЕСС ---
+      if (gameState === 'GAME' && isModelLoaded) {
+        
+        // Движение
+        const isWalking = moveVector.lengthSq() > 0.01;
+        
+        if (isWalking) {
+          // moveVector.y отрицательный, когда тянем вверх (вперед)
+          const speed = 6;
+          character.position.x += moveVector.x * speed * dt;
+          character.position.z += moveVector.y * speed * dt;
+          
+          // Поворот
+          targetRotation = Math.atan2(moveVector.x, moveVector.y) + Math.PI;
+        }
+        
+        // Плавный поворот
+        let diff = targetRotation - character.rotation.y;
+        while (diff > Math.PI)  diff -= Math.PI * 2;
+        while (diff < -Math.PI) diff += Math.PI * 2;
+        character.rotation.y += diff * Math.min(1, 10 * dt);
+
+        // Прыжок (Гравитация)
+        if (isJumping) {
+          character.position.y += jumpVelocity * dt;
+          jumpVelocity += GRAVITY * dt;
+          if (character.position.y <= 0) {
+            character.position.y = 0;
+            isJumping = false;
+            jumpVelocity = 0;
+          }
+        }
+
+        // Анимация
+        if (walkAction) walkAction.paused = !isWalking;
+        if (mixer) mixer.update(dt);
+
+        // Свет фонаря над персонажем
+        playerLight.position.copy(character.position);
+        playerLight.position.y += 2;
+
+        // Проверка сбора обломков
+        debrisList.forEach((d) => {
+          if (!d.collected) {
+            const dist = character.position.distanceTo(d.mesh.position);
+            if (dist < 2) {
+              d.collected = true;
+              scene.remove(d.mesh);
+              planetGroup.remove(d.mesh);
+              questCount++;
+              questHud.innerText = `Задание: Найти обломки (${questCount}/3)`;
+              
+              if (questCount === 3) {
+                showText("Связь восстановлена! Глава 1 завершена.", 4000);
+              } else {
+                showText(`Обломок найден! Осталось: ${3 - questCount}`, 1500);
+              }
+            }
+          }
+        });
+
+        // Камера (Следование)
+        const offset = camOffsets[currentCamMode].clone();
+        // Вращаем оффсет в зависимости от поворота персонажа
+        offset.applyAxisAngle(new THREE.Vector3(0, 1, 0), character.rotation.y);
+        
+        // Для 1-го лица смотрим строго вперед
+        if (currentCamMode === 2) {
+          targetLookAt.copy(character.position);
+          targetLookAt.y += 1.6;
+          // Смотрим чуть вперед
+          const lookDir = new THREE.Vector3(0, 0, -1).applyAxisAngle(new THREE.Vector3(0, 1, 0), character.rotation.y);
+          targetLookAt.add(lookDir.multiplyScalar(10));
+        } else {
+          targetLookAt.copy(character.position);
+          targetLookAt.y += 1.5;
+        }
+
+        // Плавное перемещение камеры
+        targetCamPos.copy(character.position).add(offset);
+        
+        // Добавляем тряску при ходьбе для реализма
+        if (isWalking && currentCamMode !== 2) {
+           targetCamPos.y += Math.sin(time * 15) * 0.05;
+        }
+
+        camera.position.lerp(targetCamPos, 5 * dt);
+        camera.lookAt(targetLookAt);
+      }
 
       renderer.render(scene, camera);
     }
+
     animate();
 
-    // ---------- Ресайз ----------
     addEventListener('resize', () => {
       camera.aspect = innerWidth / innerHeight;
       camera.updateProjectionMatrix();
