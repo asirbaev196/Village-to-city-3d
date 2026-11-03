@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>3D Деревня — Реалистичный персонаж</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body {
+      width: 100%; height: 100%; overflow: hidden; background: #87ceeb;
+      touch-action: none; user-select: none; -webkit-tap-highlight-color: transparent;
+    }
+    canvas { display: block; }
+    #info {
+      position: absolute; top: 12px; left: 50%; transform: translateX(-50%);
+      color: white; font-family: system-ui, sans-serif; font-size: 15px;
+      text-shadow: 0 1px 3px rgba(0,0,0,0.6); pointer-events: none; z-index: 10; white-space: nowrap;
+    }
+    #controls { position: fixed; bottom: 24px; left: 24px; width: 168px; height: 168px; z-index: 20; }
+    .btn {
+      position: absolute; width: 56px; height: 56px; border-radius: 14px; border: none;
+      background: rgba(255, 255, 255, 0.85); color: #222; font-size: 22px; font-weight: bold;
+      box-shadow: 0 3px 10px rgba(0,0,0,0.25); touch-action: none; cursor: pointer;
+      transition: background 0.1s, transform 0.1s;
+    }
+    .btn:active, .btn.pressed { background: rgba(80, 160, 255, 0.95); color: white; transform: scale(0.92); }
+    .up { top: 0; left: 56px; } .left { top: 56px; left: 0; }
+    .right { top: 56px; left: 112px; } .down { top: 112px; left: 56px; }
+    @media (max-width: 380px) {
+      #controls { width: 144px; height: 144px; }
+      .btn { width: 48px; height: 48px; font-size: 18px; }
+      .up { left: 48px; } .left { top: 48px; }
+      .right { top: 48px; left: 96px; } .down { top: 96px; left: 48px; }
+    }
+  </style>
+</head>
+<body>
+  <div id="info">Загрузка персонажа... ⏳</div>
+  <div id="controls">
+    <button class="btn up"    data-dir="up">▲</button>
+    <button class="btn left"  data-dir="left">◀</button>
+    <button class="btn right" data-dir="right">▶</button>
+    <button class="btn down"  data-dir="down">▼</button>
+  </div>
+
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+      "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+    }
+  }
+  </script>
+
+  <script type="module">
+    import * as THREE from 'three';
+    import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+
+    // ---------- Сцена ----------
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x87ceeb);
+    scene.fog = new THREE.Fog(0x87ceeb, 20, 90);
+
+    const camera = new THREE.PerspectiveCamera(60, innerWidth / innerHeight, 0.1, 200);
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(innerWidth, innerHeight);
+    renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+    renderer.shadowMap.enabled = true;
+    document.body.appendChild(renderer.domElement);
+
+    // ---------- Свет ----------
+    const sun = new THREE.DirectionalLight(0xfff5e0, 2);
+    sun.position.set(10, 20, 10);
+    sun.castShadow = true;
+    sun.shadow.mapSize.set(1024, 1024);
+    sun.shadow.camera.left = -50;
+    sun.shadow.camera.right = 50;
+    sun.shadow.camera.top = 50;
+    sun.shadow.camera.bottom = -50;
+    scene.add(sun);
+    scene.add(new THREE.AmbientLight(0xffffff, 0.6));
+
+    // ---------- Земля и дорога ----------
+    const grass = new THREE.Mesh(
+      new THREE.PlaneGeometry(200, 200),
+      new THREE.MeshStandardMaterial({ color: 0x4a7c3a })
+    );
+    grass.rotation.x = -Math.PI / 2;
+    grass.receiveShadow = true;
+    scene.add(grass);
+
+    const road = new THREE.Mesh(
+      new THREE.PlaneGeometry(6, 200),
+      new THREE.MeshStandardMaterial({ color: 0x8b7355 })
+    );
+    road.rotation.x = -Math.PI / 2;
+    road.position.y = 0.01;
+    road.receiveShadow = true;
+    scene.add(road);
+
+    // ---------- Дома ----------
+    function createHouse(x, z, rot) {
+      const house = new THREE.Group();
+      const walls = new THREE.Mesh(new THREE.BoxGeometry(5, 3, 4), new THREE.MeshStandardMaterial({ color: 0xd9c8a9 }));
+      walls.position.y = 1.5; walls.castShadow = true; house.add(walls);
+      const roof = new THREE.Mesh(new THREE.ConeGeometry(3.8, 2, 4), new THREE.MeshStandardMaterial({ color: 0x8b3a2a }));
+      roof.position.y = 4; roof.rotation.y = Math.PI / 4; roof.castShadow = true; house.add(roof);
+      const door = new THREE.Mesh(new THREE.BoxGeometry(0.9, 1.8, 0.1), new THREE.MeshStandardMaterial({ color: 0x5c3a21 }));
+      door.position.set(0, 0.9, 2.01); house.add(door);
+      const windowMat = new THREE.MeshStandardMaterial({ color: 0x88ccee });
+      [[-1.5, 1.8], [1.5, 1.8]].forEach(([wx, wy]) => {
+        const win = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 0.1), windowMat);
+        win.position.set(wx, wy, 2.01); house.add(win);
+      });
+      house.position.set(x, 0, z); house.rotation.y = rot; return house;
+    }
+    scene.add(createHouse(-5, -10, 0));
+    scene.add(createHouse(6, 5, Math.PI));
+
+    // ---------- Деревья ----------
+    function createTree(x, z) {
+      const tree = new THREE.Group();
+      const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.2, 1.5, 8), new THREE.MeshStandardMaterial({ color: 0x5c3a21 }));
+      trunk.position.y = 0.75; trunk.castShadow = true; tree.add(trunk);
+      const crown = new THREE.Mesh(new THREE.ConeGeometry(0.9, 2, 8), new THREE.MeshStandardMaterial({ color: 0x2d6b2d }));
+      crown.position.y = 2; crown.castShadow = true; tree.add(crown);
+      tree.position.set(x, 0, z); return tree;
+    }
+    for (let i = -40; i <= 40; i += 8) {
+      scene.add(createTree(-6 - Math.random() * 3, i + Math.random() * 4));
+      scene.add(createTree(6 + Math.random() * 3, i + Math.random() * 4));
+    }
+
+    // ---------- Реалистичный персонаж ----------
+    const character = new THREE.Group();
+    scene.add(character);
+
+    let mixer;
+    let walkAction;
+    let isModelLoaded = false;
+
+    const loader = new GLTFLoader();
+    // Загружаем модель солдата с официального сайта Three.js
+    loader.load('https://threejs.org/examples/models/gltf/Soldier.glb', (gltf) => {
+      const model = gltf.scene;
+      
+      // Настройка размера и теней
+      model.scale.set(0.8, 0.8, 0.8);
+      model.traverse((child) => {
+        if (child.isMesh) {
+          child.castShadow = true;
+          child.receiveShadow = true;
+        }
+      });
+      
+      character.add(model);
+      
+      // Подключаем анимации
+      mixer = new THREE.AnimationMixer(model);
+      
+      // Ищем анимацию ходьбы (walk) и покоя (idle)
+      const walkClip = gltf.animations.find(clip => clip.name === 'walk' || clip.name === 'Walk');
+      if (walkClip) {
+        walkAction = mixer.clipAction(walkClip);
+        walkAction.play();
+        walkAction.paused = true; // Изначально стоит на месте
+      }
+      
+      document.getElementById('info').innerText = "Управляй персонажем кнопками 👇";
+      isModelLoaded = true;
+    }, undefined, (error) => {
+      console.error("Ошибка загрузки модели:", error);
+      document.getElementById('info').innerText = "Ошибка загрузки модели 😢";
+    });
+
+    // ---------- Управление ----------
+    const keys = { up: false, down: false, left: false, right: false };
+    document.querySelectorAll('.btn').forEach(btn => {
+      const dir = btn.dataset.dir;
+      const press = (e) => { e.preventDefault(); btn.classList.add('pressed'); keys[dir] = true; };
+      const release = (e) => { e.preventDefault(); btn.classList.remove('pressed'); keys[dir] = false; };
+      btn.addEventListener('pointerdown', press);
+      btn.addEventListener('pointerup', release);
+      btn.addEventListener('pointercancel', release);
+      btn.addEventListener('pointerleave', release);
+    });
+
+    addEventListener('blur', () => {
+      Object.keys(keys).forEach(k => keys[k] = false);
+      document.querySelectorAll('.btn').forEach(b => b.classList.remove('pressed'));
+    });
+
+    // ---------- Анимация ----------
+    const clock = new THREE.Clock();
+    let targetRotation = 0;
+    camera.position.set(4, 4, -8);
+
+    function animate() {
+      requestAnimationFrame(animate);
+      const dt = Math.min(clock.getDelta(), 0.1);
+
+      let dx = 0, dz = 0;
+      if (keys.up)    dz -= 1;
+      if (keys.down)  dz += 1;
+      if (keys.left)  dx -= 1;
+      if (keys.right) dx += 1;
+
+      const isWalking = dx !== 0 || dz !== 0;
+
+      // Логика движения
+      if (isWalking) {
+        const len = Math.hypot(dx, dz);
+        dx /= len; dz /= len;
+        
+        character.position.x += dx * 3 * dt;
+        character.position.z += dz * 3 * dt;
+        
+        // Ограничения карты
+        character.position.x = Math.max(-30, Math.min(30, character.position.x));
+        character.position.z = Math.max(-90, Math.min(90, character.position.z));
+        
+        // Модель солдата смотрит по оси +Z (или -Z в зависимости от модели).
+        // Чтобы он смотрел в сторону движения, вычисляем угол.
+        targetRotation = Math.atan2(dx, dz);
+      }
+
+      // Плавный поворот
+      let diff = targetRotation - character.rotation.y;
+      while (diff > Math.PI)  diff -= Math.PI * 2;
+      while (diff < -Math.PI) diff += Math.PI * 2;
+      character.rotation.y += diff * Math.min(1, 8 * dt);
+
+      // Анимация ходьбы
+      if (isModelLoaded) {
+        if (isWalking) {
+          if (walkAction) walkAction.paused = false;
+        } else {
+          if (walkAction) walkAction.paused = true;
+        }
+        if (mixer) mixer.update(dt);
+      }
+
+      // Камера
+      const camOffset = new THREE.Vector3(0, 4, -8);
+      camOffset.applyAxisAngle(new THREE.Vector3(0, 1, 0), character.rotation.y);
+      camera.position.lerp(character.position.clone().add(camOffset), 1 - Math.pow(0.001, dt));
+      camera.lookAt(character.position.x, character.position.y + 1, character.position.z);
+
+      renderer.render(scene, camera);
+    }
+    animate();
+
+    // ---------- Ресайз ----------
+    addEventListener('resize', () => {
+      camera.aspect = innerWidth / innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(innerWidth, innerHeight);
+    });
+  </script>
+</body>
+</html>
